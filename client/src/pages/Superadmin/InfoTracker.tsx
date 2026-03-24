@@ -3,15 +3,15 @@ import { Search, Upload, Eye, Share2, Clock } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { citizenRecords, CitizenRecord } from "@/lib/mock-data";
+import { useQuery } from "@tanstack/react-query";
 
-const actionIcons = {
+const actionIcons: Record<string, any> = {
   submitted: Upload,
   accessed: Eye,
   shared: Share2,
 };
 
-const actionColors = {
+const actionColors: Record<string, string> = {
   submitted: "text-secondary",
   accessed: "text-primary",
   shared: "text-success",
@@ -19,14 +19,23 @@ const actionColors = {
 
 export default function InfoTracker() {
   const [search, setSearch] = useState("");
-  const [result, setResult] = useState<CitizenRecord | null>(null);
+  const [result, setResult] = useState<any | null>(null);
   const [searched, setSearched] = useState(false);
+
+  const { data: citizenRecords = [], isLoading } = useQuery({
+    queryKey: ['citizen-records'],
+    queryFn: async () => {
+      const res = await fetch('http://localhost:4000/citizen-records');
+      if (!res.ok) throw new Error('Failed to fetch records');
+      return res.json();
+    }
+  });
 
   const handleSearch = () => {
     if (!search.trim()) return;
     setSearched(true);
     const found = citizenRecords.find(
-      (c) =>
+      (c: any) =>
         c.fullName.toLowerCase().includes(search.toLowerCase()) ||
         c.citizenId.toLowerCase().includes(search.toLowerCase())
     );
@@ -37,7 +46,7 @@ export default function InfoTracker() {
     <div className="space-y-6 animate-fade-in">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Information Tracker</h1>
-        <p className="text-sm text-muted-foreground mt-1">Track citizen data flow across registered offices</p>
+        <p className="text-sm text-muted-foreground mt-1">Track citizen data flow across registered offices. (Connects to DB Activity table eventually)</p>
       </div>
 
       <div className="flex gap-3 max-w-lg">
@@ -56,9 +65,15 @@ export default function InfoTracker() {
         </button>
       </div>
 
-      <p className="text-xs text-muted-foreground">Try: "Juan Dela Cruz", "Maria Clara Santos", or "CIT-2024-0001"</p>
+      {!isLoading && citizenRecords.length === 0 && (
+        <Card className="mt-6 border-dashed">
+          <CardContent className="p-8 text-center text-muted-foreground">
+            No citizen tracking data initialized in the backend database yet!
+          </CardContent>
+        </Card>
+      )}
 
-      {searched && !result && (
+      {searched && !result && citizenRecords.length > 0 && (
         <Card>
           <CardContent className="p-8 text-center text-muted-foreground">
             No records found for "{search}". Try a different name or ID.
@@ -74,42 +89,11 @@ export default function InfoTracker() {
                 <CardTitle className="text-lg">{result.fullName}</CardTitle>
                 <p className="text-sm text-muted-foreground font-mono">{result.citizenId}</p>
               </div>
-              <Badge variant="outline">{result.timeline.length} entries</Badge>
+              <Badge variant="outline">{result?.timeline?.length || 0} entries</Badge>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="relative">
-              <div className="absolute left-[15px] top-0 bottom-0 w-px bg-border" />
-              <div className="space-y-6">
-                {result.timeline.map((entry, i) => {
-                  const Icon = actionIcons[entry.action];
-                  return (
-                    <div key={i} className="relative flex gap-4 pl-0">
-                      <div className={`w-8 h-8 rounded-full bg-card border-2 border-border flex items-center justify-center shrink-0 z-10 ${actionColors[entry.action]}`}>
-                        <Icon className="h-3.5 w-3.5" />
-                      </div>
-                      <div className="flex-1 pb-1">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-medium text-foreground">{entry.office}</p>
-                          <Badge variant="outline" className="text-[10px]">{entry.status}</Badge>
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Clock className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground">{entry.dateTime}</span>
-                        </div>
-                        <Badge className={`mt-2 text-[10px] border-0 ${
-                          entry.action === "submitted" ? "bg-secondary/10 text-secondary" :
-                          entry.action === "accessed" ? "bg-primary/10 text-primary" :
-                          "bg-success/10 text-success"
-                        }`}>
-                          {entry.action}
-                        </Badge>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            {/* dynamic timeline ui */}
           </CardContent>
         </Card>
       )}

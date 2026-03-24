@@ -11,6 +11,8 @@ import DataRequests from "@/pages/Superadmin/DataRequests";
 import InfoTracker from "@/pages/Superadmin/InfoTracker";
 import NotFound from "@/pages/NotFound";
 import Login from "@/pages/Login";
+import SystemRegister from "@/pages/SystemRegister";
+import Landing from "@/pages/Landing";
 
 const queryClient = new QueryClient();
 
@@ -21,8 +23,9 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Login />} />
+          <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/system-register" element={<SystemRegister />} />
           <Route element={<AppLayout />}>
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="providers" element={<Providers />} />

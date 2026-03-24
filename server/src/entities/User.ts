@@ -1,31 +1,22 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, BaseEntity } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, BaseEntity } from 'typeorm';
 
 @Entity({ name: 'user_tbl' })
 export class User extends BaseEntity {
-  @PrimaryGeneratedColumn('uuid')
-  id!: string;
+  @PrimaryGeneratedColumn({ name: 'user_id' })
+  id!: number;
 
-  @Column({ type: 'varchar', length: 100, unique: true, nullable: true })
-  username!: string;
-
-  @Column({ type: 'varchar', length: 100, unique: true, nullable: true })
-  email!: string;
-
-  @Column({ type: 'varchar', length: 100, nullable: true })
+  @Column({ name: 'full_name', type: 'varchar', length: 100 })
   name!: string;
 
-  @Column({ type: 'varchar', length: 255, nullable: true })
+  @Column({ name: 'user_name', type: 'varchar', length: 50, unique: true })
+  username!: string;
+
+  @Column({ name: 'password', type: 'varchar', length: 255 })
   password!: string;
 
-  @Column({ type: 'varchar', length: 50, default: 'user', nullable: true })
+  @Column({ name: 'role', type: 'varchar', length: 50 })
   role!: string;
 
-  @Column({ type: 'boolean', default: true })
+  @Column({ name: 'status', type: 'boolean', default: true })
   isActive!: boolean;
-
-  @CreateDateColumn({ type: 'timestamp with time zone' })
-  createdAt!: Date;
-
-  @UpdateDateColumn({ type: 'timestamp with time zone' })
-  updatedAt!: Date;
 }

@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import { User } from './entities/User';
+import { System } from './entities/System';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -12,9 +13,9 @@ export const AppDataSource = new DataSource({
   username: process.env.DB_USERNAME || 'postgres',
   password: process.env.DB_PASSWORD || 'postgre',
   database: process.env.DB_DATABASE || 'CDEMS_DB',
-  synchronize: true,
+  synchronize: false,
   logging: false,
-  entities: [User],
+  entities: [User, System],
   migrations: [],
   subscribers: [],
 });

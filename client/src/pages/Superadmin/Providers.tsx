@@ -1,140 +1,119 @@
 import { useState } from "react";
-import { Building2, Search, X } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Building2, Search } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { providers, Provider } from "@/lib/mock-data";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-
-const mockRecords = Array.from({ length: 25 }, (_, i) => ({
-  id: `REC-${String(i + 1).padStart(4, "0")}`,
-  name: ["Juan Dela Cruz", "Maria Santos", "Pedro Lim", "Ana Reyes", "Rosa Garcia"][i % 5],
-  type: ["Certificate", "Permit", "Registration", "License", "Record"][i % 5],
-  date: `2025-03-${String(20 - (i % 15)).padStart(2, "0")}`,
-  status: ["Verified", "Pending", "Processed"][i % 3],
-}));
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 
 export default function Providers() {
   const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<Provider | null>(null);
-  const [recordSearch, setRecordSearch] = useState("");
-  const [page, setPage] = useState(1);
-  const perPage = 8;
+  const [selected, setSelected] = useState<any | null>(null);
 
-  const filtered = providers.filter(
-    (p) =>
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.acronym.toLowerCase().includes(search.toLowerCase())
-  );
+  const { data: systems = [], isLoading } = useQuery({
+    queryKey: ['systems'],
+    queryFn: async () => {
+      const res = await fetch('http://localhost:4000/systems');
+      if (!res.ok) throw new Error('Failed to fetch systems');
+      return res.json();
+    }
+  });
 
-  const filteredRecords = mockRecords.filter(
-    (r) =>
-      r.name.toLowerCase().includes(recordSearch.toLowerCase()) ||
-      r.id.toLowerCase().includes(recordSearch.toLowerCase())
+  const filtered = systems.filter((p: any) =>
+    p.name.toLowerCase().includes(search.toLowerCase())
   );
-  const totalPages = Math.ceil(filteredRecords.length / perPage);
-  const paginatedRecords = filteredRecords.slice((page - 1) * perPage, page * perPage);
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Registered Providers</h1>
-          <p className="text-sm text-muted-foreground mt-1">Approved data provider offices and agencies</p>
+          <p className="text-sm text-muted-foreground mt-1">External offices and connected systems</p>
         </div>
       </div>
 
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search providers..."
+          placeholder="Search systems..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-9"
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtered.map((provider) => (
-          <Card
-            key={provider.id}
-            className="cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => { setSelected(provider); setPage(1); setRecordSearch(""); }}
-          >
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between mb-3">
-                <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center">
-                  <Building2 className="h-5 w-5 text-secondary" />
+      {isLoading ? (
+        <div className="text-center text-muted-foreground">Loading systems...</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.map((provider: any) => (
+            <Card
+              key={provider.id}
+              className="cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => setSelected(provider)}
+            >
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center">
+                    <Building2 className="h-5 w-5 text-secondary" />
+                  </div>
+                  <Badge variant={provider.status === "active" ? "default" : (provider.status === "pending" ? "outline" : "destructive")} className={provider.status === "active" ? "bg-success text-success-foreground" : ""}>
+                    {provider.status.toUpperCase()}
+                  </Badge>
                 </div>
-                <Badge variant={provider.status === "active" ? "default" : "destructive"} className={provider.status === "active" ? "bg-success text-success-foreground" : ""}>
-                  {provider.status}
-                </Badge>
-              </div>
-              <h3 className="font-semibold text-foreground">{provider.name}</h3>
-              <p className="text-xs text-muted-foreground">{provider.acronym}</p>
-              <div className="flex items-center justify-between mt-4 pt-3 border-t">
-                <span className="text-xs text-muted-foreground">Registered: {provider.dateRegistered}</span>
-                <span className="text-xs font-medium text-foreground">{provider.recordCount.toLocaleString()} records</span>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                <h3 className="font-semibold text-foreground">{provider.name}</h3>
+                <div className="flex items-center justify-between mt-4 pt-3 border-t">
+                  <span className="text-xs text-muted-foreground">Registered: {new Date(provider.createdAt).toLocaleDateString()}</span>
+                  <span className="text-xs font-medium text-foreground">ID: {provider.id}</span>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+          {filtered.length === 0 && (
+            <div className="text-sm text-muted-foreground col-span-full">No systems found.</div>
+          )}
+        </div>
+      )}
 
       <Dialog open={!!selected} onOpenChange={() => setSelected(null)}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-auto">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>{selected?.name} ({selected?.acronym})</DialogTitle>
+            <DialogTitle>{selected?.name}</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground mb-4">{selected?.description}</p>
-
-          <div className="relative max-w-xs mb-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search records..."
-              value={recordSearch}
-              onChange={(e) => { setRecordSearch(e.target.value); setPage(1); }}
-              className="pl-9"
-            />
-          </div>
-
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Record ID</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {paginatedRecords.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="font-mono text-xs">{r.id}</TableCell>
-                  <TableCell>{r.name}</TableCell>
-                  <TableCell>{r.type}</TableCell>
-                  <TableCell>{r.date}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-xs">{r.status}</Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-4">
-              <span className="text-xs text-muted-foreground">
-                Page {page} of {totalPages}
-              </span>
-              <div className="flex gap-2">
-                <button onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1} className="text-xs px-3 py-1 rounded bg-muted text-foreground disabled:opacity-50">Prev</button>
-                <button onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page === totalPages} className="text-xs px-3 py-1 rounded bg-muted text-foreground disabled:opacity-50">Next</button>
+          <div className="space-y-4">
+            <div>
+              <Label className="text-muted-foreground text-xs uppercase tracking-wider">Status</Label>
+              <div className="mt-1">
+                <Badge variant={selected?.status === "active" ? "default" : "outline"} className={selected?.status === "active" ? "bg-success text-success-foreground" : ""}>
+                  {selected?.status.toUpperCase()}
+                </Badge>
               </div>
             </div>
-          )}
+            
+            <div>
+              <Label className="text-muted-foreground text-xs uppercase tracking-wider">API Key</Label>
+              <div className="mt-1 flex items-center gap-2">
+                <Input readOnly value={selected?.apiKey || ""} className="font-mono text-sm bg-muted" />
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">This key is used by the external system to authenticate.</p>
+            </div>
+
+            <div>
+              <Label className="text-muted-foreground text-xs uppercase tracking-wider">Requested Permissions</Label>
+              <div className="mt-1 text-sm bg-muted p-3 rounded-md min-h-[60px]">
+                {selected?.permissions?.capabilities || "No specific permissions requested"}
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-muted-foreground text-xs uppercase tracking-wider">Registered At</Label>
+              <div className="mt-1 text-sm">
+                {selected?.createdAt ? new Date(selected.createdAt).toLocaleString() : ""}
+              </div>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
