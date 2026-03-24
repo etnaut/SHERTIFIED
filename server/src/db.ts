@@ -11,7 +11,7 @@ export const AppDataSource = new DataSource({
   port: Number(process.env.DB_PORT || 5432),
   username: process.env.DB_USERNAME || 'postgres',
   password: process.env.DB_PASSWORD || 'postgre',
-  database: process.env.DB_DATABASE || 'shertified',
+  database: process.env.DB_DATABASE || 'CDEMS_DB',
   synchronize: true,
   logging: false,
   entities: [User],

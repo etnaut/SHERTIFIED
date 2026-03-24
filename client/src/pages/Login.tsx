@@ -18,12 +18,21 @@ const Login = () => {
     setIsSubmitting(true);
 
     try {
-      // TODO: replace this with real authentication service call
-      await new Promise((resolve) => setTimeout(resolve, 600));
+      const response = await fetch("http://localhost:4000/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: identifier.trim(), email: identifier.trim(), password }),
+      });
 
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error((errorData as any).error || "Invalid username or password");
+      }
+
+      const userData = await response.json();
       toast({
         title: "Login successful",
-        description: `Welcome back${identifier.trim() ? `, ${identifier}` : ""}!`,
+        description: `Welcome back, ${userData.username || identifier}!`,
       });
 
       navigate("/dashboard");
@@ -31,7 +40,7 @@ const Login = () => {
       console.error("Login failed", error);
       toast({
         title: "Login failed",
-        description: "Unable to authenticate. Please check your credentials and try again.",
+        description: `${(error as Error).message || "Unable to authenticate"}`,
         variant: "destructive",
       });
     } finally {
