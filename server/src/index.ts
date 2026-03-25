@@ -2,9 +2,10 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
-import { connectDatabase } from './db';
+import { AppDataSource } from './db';
 import { User } from './entities/User';
 import { System } from './entities/System';
+import { SharedData } from './entities/SharedData';
 import crypto from 'crypto';
 
 dotenv.config();
@@ -108,12 +109,29 @@ app.patch('/systems/:id/status', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { status, apiKey, permissions } = req.body;
+    
     const system = await System.findOne({ where: { id: Number(id) } });
     if (!system) return res.status(404).json({ error: 'System not found' });
-    
+
+    if (status === 'active' && permissions !== undefined) {
+      import('jsonwebtoken').then((jwt) => {
+        const payload = {
+          id: system.id,
+          name: system.name,
+          status: 'active',
+          permissions: permissions,
+          main_system_name: 'CDEMS'
+        };
+        system.apiKey = jwt.sign(payload, 'super-secret-shertified-key');
+        system.permissions = permissions;
+        system.status = status;
+        system.save().then(() => res.json(system));
+      });
+      return;
+    }
+
     system.status = status;
-    if (apiKey) system.apiKey = apiKey;
-    if (permissions) system.permissions = { capabilities: permissions };
+    if (permissions !== undefined) system.permissions = permissions;
 
     await system.save();
     res.json(system);
@@ -153,7 +171,8 @@ app.get('/api/system/status', authenticateSystem, (req: Request, res: Response) 
     name: system.name,
     status: system.status,
     permissions: system.permissions || {},
-    createdAt: system.createdAt
+    createdAt: system.createdAt,
+    main_system_name: 'CDEMS'
   });
 });
 
@@ -221,8 +240,48 @@ app.post('/login', async (req: Request, res: Response) => {
 
 const port = Number(process.env.PORT || 4000);
 
-connectDatabase().then(() => {
-  app.listen(port, () => {
-    console.log(`Server listening on port ${port}`);
-  });
-});
+AppDataSource.initialize().then(async () => {
+    console.log("Database connected successfully");
+    
+    await AppDataSource.query(`
+      CREATE TABLE IF NOT EXISTS shared_data (
+        id SERIAL PRIMARY KEY,
+        system_id INTEGER REFERENCES systems(system_id) ON DELETE CASCADE,
+        payload JSONB NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Endpoint for System B to POST shared data
+    app.post('/api/data/share', authenticateSystem, async (req: Request, res: Response) => {
+      try {
+        const system = (req as any).system as System;
+        const { payload } = req.body;
+        
+        const shared = SharedData.create({
+          system_id: system.id,
+          payload
+        });
+        await shared.save();
+        
+        res.json({ message: 'Data securely shared to CDEMS', id: shared.id });
+      } catch (error) {
+        res.status(500).json({ error: 'Failed to save shared data' });
+      }
+    });
+
+    // Endpoint for System A Superadmin to GET shared data from a specific provider
+    app.get('/api/systems/:id/shared-data', async (req: Request, res: Response) => {
+      try {
+        const { id } = req.params;
+        const data = await SharedData.find({ where: { system_id: Number(id) }, order: { createdAt: 'DESC' } });
+        res.json(data);
+      } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch shared data' });
+      }
+    });
+
+    app.listen(port, () => {
+      console.log(`Server listening on port ${port}`);
+    });
+}).catch((error) => console.log("Database connection failed", error));

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Building2, Search } from "lucide-react";
+import { Building2, Search, Database } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ export default function Providers() {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<any | null>(null);
 
+  // Fetch all systems
   const { data: systems = [], isLoading } = useQuery({
     queryKey: ['systems'],
     queryFn: async () => {
@@ -24,6 +25,18 @@ export default function Providers() {
   const filtered = systems.filter((p: any) =>
     p.name.toLowerCase().includes(search.toLowerCase())
   );
+
+  // Fetch shared data for the selected system
+  const { data: sharedData = [], isLoading: isLoadingShared } = useQuery({
+    queryKey: ['shared-data', selected?.id],
+    queryFn: async () => {
+      if (!selected?.id) return [];
+      const res = await fetch(`http://localhost:4000/api/systems/${selected.id}/shared-data`);
+      if (!res.ok) throw new Error('Failed to fetch shared data');
+      return res.json();
+    },
+    enabled: !!selected?.id
+  });
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -109,9 +122,37 @@ export default function Providers() {
 
             <div>
               <Label className="text-muted-foreground text-xs uppercase tracking-wider">Registered At</Label>
-              <div className="mt-1 text-sm">
+              <div className="mt-1 text-sm bg-muted p-3 rounded-md">
                 {selected?.createdAt ? new Date(selected.createdAt).toLocaleString() : ""}
               </div>
+            </div>
+
+            <div className="pt-4 border-t border-border">
+              <Label className="text-foreground text-sm font-semibold flex items-center gap-2 mb-3">
+                <Database className="h-4 w-4 text-primary" />
+                Data Shared to CDEMS by this Office
+              </Label>
+              
+              {isLoadingShared ? (
+                <div className="text-sm text-muted-foreground">Loading shared data...</div>
+              ) : sharedData.length === 0 ? (
+                <div className="text-sm text-muted-foreground italic bg-muted/30 p-4 rounded-md text-center border border-dashed">
+                  This system has not shared any data to the main CDEMS network yet.
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
+                  {sharedData.map((data: any) => (
+                    <div key={data.id} className="bg-muted p-3 rounded-md border text-xs relative">
+                      <div className="absolute top-2 right-2 text-[10px] text-muted-foreground">
+                        {new Date(data.createdAt).toLocaleString()}
+                      </div>
+                      <pre className="mt-2 font-mono whitespace-pre-wrap text-foreground">
+                        {JSON.stringify(data.payload, null, 2)}
+                      </pre>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </DialogContent>

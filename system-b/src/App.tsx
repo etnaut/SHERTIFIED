@@ -4,6 +4,7 @@ import './App.css';
 function App() {
   const [apiKey, setApiKey] = useState('');
   const [savedKey, setSavedKey] = useState(localStorage.getItem('system_b_api_key') || '');
+  const [systemName, setSystemName] = useState('');
   const [status, setStatus] = useState<string | null>(null);
   const [permissions, setPermissions] = useState<any>(null);
   const [error, setError] = useState('');
@@ -13,21 +14,30 @@ function App() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('http://localhost:4000/api/system/status', {
-        headers: {
-          'Authorization': `Bearer ${key}`
-        }
-      });
-      if (!res.ok) {
-        throw new Error('Invalid API Key or your system was removed.');
+      // Decode JWT Token Payload
+      const parts = key.split('.');
+      if (parts.length !== 3) {
+        throw new Error("Invalid API Key format. Expected a JWT token.");
       }
-      const data = await res.json();
+      
+      const payloadBase64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const payloadString = decodeURIComponent(atob(payloadBase64).split('').map(function(c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      
+      const data = JSON.parse(payloadString);
+
+      if (data.status !== "active") {
+         throw new Error("Your embedded token indicates you are not approved.");
+      }
+
       setStatus(data.status);
-      setPermissions(data.permissions);
+      setSystemName(data.name || '');
+      setPermissions(data.permissions || {});
       setSavedKey(key);
       localStorage.setItem('system_b_api_key', key);
     } catch (e: any) {
-      setError(e.message);
+      setError(e.message || "Failed to parse the API Key payload.");
       setStatus(null);
     } finally {
       setLoading(false);
@@ -38,11 +48,6 @@ function App() {
     if (savedKey) {
       checkStatus(savedKey);
     }
-    // Poll every 30 seconds to optionally refresh approval status
-    const interval = setInterval(() => {
-      if (savedKey) checkStatus(savedKey);
-    }, 30000);
-    return () => clearInterval(interval);
   }, [savedKey]);
 
   const handleSaveKey = (e: React.FormEvent) => {
@@ -55,6 +60,7 @@ function App() {
   const handleLogout = () => {
     localStorage.removeItem('system_b_api_key');
     setSavedKey('');
+    setSystemName('');
     setStatus(null);
     setPermissions(null);
     setApiKey('');
@@ -64,8 +70,8 @@ function App() {
     return (
       <div className="container center-screen">
         <div className="card login-card">
-          <h1>External System Portal (System B)</h1>
-          <p>Please enter the API Key provided by the Main System (System A) superadmin to connect.</p>
+          <h1>External Office Portal</h1>
+          <p>Please enter the API Key provided by the CDEMS superadmin to connect.</p>
           <form onSubmit={handleSaveKey} className="key-form">
             <input 
               type="text" 
@@ -75,7 +81,7 @@ function App() {
               required
             />
             <button type="submit" disabled={loading} className="btn-primary w-full">
-              {loading ? 'Connecting...' : 'Connect to Main System'}
+              {loading ? 'Connecting...' : 'Connect to CDEMS'}
             </button>
           </form>
           {error && <div className="error-box">{error}</div>}
@@ -85,13 +91,21 @@ function App() {
   }
 
   const isApproved = status === 'active';
+  const canSendData = !!permissions?.send_data;
+  const canRequestRecords = !!permissions?.request_public_records;
+  const canViewReports = !!permissions?.view_reports;
+
+  const noActionChecked = !canSendData && !canRequestRecords && !canViewReports;
 
   return (
     <div className="container">
       <div className="header">
         <div>
-          <h1>System B Internal Dashboard</h1>
-          <p>Connected to SHERTIFIED Network</p>
+          <h1>Internal Office Dashboard</h1>
+          <p>
+            Connected Name: <strong>{systemName || 'Unknown Office'}</strong><br/>
+            Network: CDEMS Core
+          </p>
         </div>
         <button onClick={handleLogout} className="btn-secondary">Disconnect API</button>
       </div>
@@ -111,22 +125,58 @@ function App() {
         {isApproved ? (
           <div className="approved-section animate-in">
             <div className="success-box">
-              ✓ Your system is fully approved and securely connected to System A.
+              ✓ Your system is fully approved and securely connected to CDEMS.
             </div>
             
-            {/* Conditional UI Module based on Approval Status */}
             <div className="integration-module">
               <h3>Integrated Features Unlocked</h3>
               <p>Because your system is <strong>Approved</strong>, you can now access the following features:</p>
               
               <div className="action-grid">
-                <button className="btn-action primary-action" onClick={() => alert('Secure encrypted payload sent to System A!')}>
-                  🚀 Send Data to Main System
-                </button>
-                <button className="btn-action secondary-action" onClick={() => alert('Fetching securely from System A API...')}>
-                  📥 Request Public Records
-                </button>
+                {canSendData && (
+                  <button className="btn-action primary-action" onClick={async () => {
+                    alert('Sending secure payload to CDEMS...');
+                    try {
+                      await fetch('http://localhost:4000/api/data/share', {
+                        method: 'POST',
+                        headers: { 
+                          'Content-Type': 'application/json',
+                          'Authorization': `Bearer ${savedKey}` 
+                        },
+                        body: JSON.stringify({
+                          payload: {
+                            patient: "Juan Dela Cruz",
+                            status: "Cleared",
+                            records: ["Vax-A", "Vax-B"],
+                            timestamp: new Date().toISOString()
+                          }
+                        })
+                      });
+                      alert('Done! Data securely shared to CDEMS.');
+                    } catch (e) {
+                      alert('Error sharing data');
+                    }
+                  }}>
+                    🚀 Send Data to CDEMS
+                  </button>
+                )}
+                {canRequestRecords && (
+                  <button className="btn-action secondary-action" onClick={() => alert('Fetching securely from CDEMS API...')}>
+                    📥 Request Public Records
+                  </button>
+                )}
+                {canViewReports && (
+                  <button className="btn-action outline-action" style={{ backgroundColor: 'white', border: '2px solid #cbd5e1', color: '#374151' }} onClick={() => alert('Opening reports center...')}>
+                    📊 View Reports
+                  </button>
+                )}
               </div>
+
+              {noActionChecked && (
+                <div className="mt-4 p-4" style={{ backgroundColor: '#f3f4f6', borderRadius: '6px', fontSize: '0.9rem', color: '#6b7280' }}>
+                  Superadmin approved your connection but granted no specific feature assignments.
+                </div>
+              )}
             </div>
 
             <div className="permissions-box">
@@ -142,7 +192,7 @@ function App() {
                 Your system registration is currently marked as <strong>{status?.toUpperCase()}</strong>.
               </p>
               <p className="mt-2">
-                The "Send Data" and other integrated modules are hidden. You must wait for the Superadmin of System A to review your registration and switch your status to <strong>ACTIVE</strong>.
+                The "Send Data" and other integrated modules are hidden. You must wait for the CDEMS Superadmin to review your registration and switch your status to <strong>ACTIVE</strong>.
               </p>
             </div>
             <button className="btn-outline mt-4" onClick={() => checkStatus(savedKey)} disabled={loading}>

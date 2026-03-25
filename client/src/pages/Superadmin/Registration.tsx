@@ -15,7 +15,13 @@ export default function Registration() {
   const [actionDialog, setActionDialog] = useState<{ request: any; action: "approve" | "reject" } | null>(null);
   const [remarks, setRemarks] = useState("");
   const [apiKeyInput, setApiKeyInput] = useState("");
-  const [permissionsInput, setPermissionsInput] = useState("");
+  
+  const defaultPermissions = { send_data: false, request_public_records: false, view_reports: false };
+  const [permissionsInput, setPermissionsInput] = useState<Record<string, boolean>>(defaultPermissions);
+
+  const handlePermissionChange = (key: string, checked: boolean) => {
+    setPermissionsInput((prev) => ({ ...prev, [key]: checked }));
+  };
 
   const { data: requests = [], isLoading } = useQuery({
     queryKey: ['systems'],
@@ -43,16 +49,20 @@ export default function Registration() {
 
   const openDialog = (req: any, action: "approve" | "reject") => {
     setActionDialog({ request: req, action });
-    setApiKeyInput(req.apiKey || "");
-    setPermissionsInput(req.permissions?.capabilities || "");
+    const perms = req.permissions || defaultPermissions;
+    // Extract any existing keys to prepopulate checkboxes (fallback to false if missing)
+    setPermissionsInput({
+      send_data: !!perms.send_data,
+      request_public_records: !!perms.request_public_records,
+      view_reports: !!perms.view_reports,
+    });
     setRemarks("");
   };
 
   const closeDialog = () => {
     setActionDialog(null);
     setRemarks("");
-    setApiKeyInput("");
-    setPermissionsInput("");
+    setPermissionsInput(defaultPermissions);
   };
 
   const handleAction = () => {
@@ -62,9 +72,8 @@ export default function Registration() {
     
     mutation.mutate({ 
       id: request.id, 
-      status: newStatus, 
-      apiKey: action === "approve" ? apiKeyInput : undefined, 
-      permissions: action === "approve" ? permissionsInput : undefined 
+      status: newStatus,
+      permissions: action === "approve" ? JSON.parse(JSON.stringify(permissionsInput)) : undefined as any
     }, {
       onSuccess: () => {
         toast.success(`${request.name} has been ${action === "approve" ? "approved" : "rejected"}.`);
@@ -106,7 +115,15 @@ export default function Registration() {
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground mt-1">
-                      {req.permissions?.capabilities || "No capabilities requested."}
+                      {req.permissions && typeof req.permissions === 'object' ? (
+                        <>
+                          <Badge variant="secondary" className="mr-1 mb-1">{req.permissions.send_data ? "✓ Send Data" : "✗ Send Data"}</Badge>
+                          <Badge variant="secondary" className="mr-1 mb-1">{req.permissions.request_public_records ? "✓ Request Records" : "✗ Request Records"}</Badge>
+                          <Badge variant="secondary" className="mr-1 mb-1">{req.permissions.view_reports ? "✓ View Reports" : "✗ View Reports"}</Badge>
+                        </>
+                      ) : (
+                        "No capabilities requested."
+                      )}
                     </p>
                     <div className="flex gap-4 mt-3 text-xs text-muted-foreground">
                       <span>Submitted: {new Date(req.createdAt).toLocaleDateString()}</span>
@@ -157,24 +174,26 @@ export default function Registration() {
           <div className="space-y-4">
             {actionDialog?.action === "approve" && (
               <>
-                <div className="space-y-2">
-                  <Label>Assign API Key</Label>
-                  <Input 
-                    value={apiKeyInput} 
-                    onChange={(e) => setApiKeyInput(e.target.value)} 
-                    placeholder="Auto-generated key provided by default..."
-                    className="font-mono text-sm"
-                  />
-                  <p className="text-xs text-muted-foreground">This is the secure key that will be provided to the external system.</p>
-                </div>
-                <div className="space-y-2">
-                  <Label>Assign Permissions Focus</Label>
-                  <Textarea 
-                    value={permissionsInput} 
-                    onChange={(e) => setPermissionsInput(e.target.value)} 
-                    placeholder="e.g. read_citizen_records"
-                  />
-                  <p className="text-xs text-muted-foreground">Explicitly define what API endpoints this system is allowed to consume.</p>
+                <div className="space-y-4 pt-2">
+                  <Label className="text-base">Assign Permissions</Label>
+                  <p className="text-sm text-foreground mb-2 p-3 bg-secondary/10 border border-secondary rounded-md">
+                    <strong>Note:</strong> The API Key will be automatically generated as a secure JSON Web Token (JWT) that explicitly encodes the permissions you select below.
+                  </p>
+                  <div className="space-y-3 border p-4 rounded-md bg-muted/50">
+                    <div className="flex items-center gap-3">
+                      <input type="checkbox" className="h-4 w-4" id="send_data" checked={permissionsInput.send_data} onChange={(e) => handlePermissionChange('send_data', e.target.checked)} />
+                      <Label htmlFor="send_data" className="font-medium cursor-pointer text-sm">Send Data to Main System</Label>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <input type="checkbox" className="h-4 w-4" id="request_public_records" checked={permissionsInput.request_public_records} onChange={(e) => handlePermissionChange('request_public_records', e.target.checked)} />
+                      <Label htmlFor="request_public_records" className="font-medium cursor-pointer text-sm">Request Public Records</Label>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <input type="checkbox" className="h-4 w-4" id="view_reports" checked={permissionsInput.view_reports} onChange={(e) => handlePermissionChange('view_reports', e.target.checked)} />
+                      <Label htmlFor="view_reports" className="font-medium cursor-pointer text-sm">View System Reports</Label>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-snug">Explicitly select the specific API actions this system is officially allowed to perform over the secure connection.</p>
                 </div>
               </>
             )}
@@ -189,7 +208,7 @@ export default function Registration() {
               className={actionDialog?.action === "approve" ? "bg-success hover:bg-success/90 text-success-foreground" : ""}
               variant={actionDialog?.action === "reject" ? "destructive" : "default"}
               onClick={handleAction}
-              disabled={mutation.isPending || (actionDialog?.action === "approve" && !apiKeyInput.trim())}
+              disabled={mutation.isPending}
             >
               {mutation.isPending ? "Processing..." : `Confirm ${actionDialog?.action === "approve" ? "Approval" : "Rejection"}`}
             </Button>
