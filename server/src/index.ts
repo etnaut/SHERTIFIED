@@ -390,7 +390,7 @@ AppDataSource.initialize().then(async () => {
           for (const doc of sharedDocs) {
             if (doc.payload?.citizens && Array.isArray(doc.payload.citizens)) {
               const citizensFiltered = doc.payload.citizens.map((citizen: any) => {
-                const compiled: any = {};
+                const compiled: any = { _docId: doc.id, _originalId: citizen.id || `${citizen.firstName}-${citizen.lastName}` };
                 for (const col of dreq.requested_columns) {
                   if (citizen[col] !== undefined) {
                     compiled[col] = citizen[col];
@@ -411,6 +411,37 @@ AppDataSource.initialize().then(async () => {
         res.json(results);
       } catch (err) {
         res.status(500).json({ error: 'Failed to fetch authorized data' });
+      }
+    });
+
+    // Endpoint for external systems to sync back modifications
+    app.patch('/api/data/update-citizen', authenticateSystem, async (req: Request, res: Response) => {
+      try {
+        const system = (req as any).system as System;
+        const { docId, originalId, updates } = req.body;
+        
+        if (!docId || !originalId || !updates) {
+          return res.status(400).json({ error: 'Missing required sync parameters' });
+        }
+
+        const sharedDoc = await SharedData.findOne({ where: { id: docId } });
+        if (!sharedDoc) return res.status(404).json({ error: 'Source document not found' });
+        
+        if (sharedDoc.payload?.citizens && Array.isArray(sharedDoc.payload.citizens)) {
+          const cIndex = sharedDoc.payload.citizens.findIndex((c: any) => 
+            String(c.id) === String(originalId) || `${c.firstName}-${c.lastName}` === originalId
+          );
+          
+          if (cIndex > -1) {
+             sharedDoc.payload.citizens[cIndex] = { ...sharedDoc.payload.citizens[cIndex], ...updates };
+             await AppDataSource.createQueryBuilder().update(SharedData).set({ payload: sharedDoc.payload }).where("id = :id", { id: sharedDoc.id }).execute();
+             await logAction(system.name, 'Synced Edit to CDEMS', `Updated record natively anchored to Document ${docId}`);
+             return res.json({ success: true });
+          }
+        }
+        res.status(404).json({ error: 'Citizen not found in document' });
+      } catch (e) {
+        res.status(500).json({ error: 'Update failed' });
       }
     });
 

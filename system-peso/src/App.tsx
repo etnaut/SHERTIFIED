@@ -70,7 +70,7 @@ function App() {
   // Cross-system Data Request State
   const [isDataRequestModalOpen, setDataRequestModalOpen] = useState(false);
   const [registeredSystems, setRegisteredSystems] = useState<any[]>([]);
-  const [targetSystemId, setTargetSystemId] = useState<number | null>(null);
+  const [targetSystemIds, setTargetSystemIds] = useState<number[]>([]);
   const [reqColumns, setReqColumns] = useState<Record<string, boolean>>({});
   const [approvedData, setApprovedData] = useState<any[]>([]);
   const [modalLoading, setModalLoading] = useState(false);
@@ -194,35 +194,60 @@ function App() {
   };
 
   const submitDataRequest = async () => {
-    if (!targetSystemId) return alert("Select a target system.");
+    if (targetSystemIds.length === 0) return alert("Select at least one target system.");
     const selectedCols = Object.keys(reqColumns).filter(k => reqColumns[k]);
     if (selectedCols.length === 0) return alert("Select at least one column to request.");
     
     setModalLoading(true);
     try {
-      const res = await fetch('http://localhost:4000/api/data-requests', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${savedKey}` 
-        },
-        body: JSON.stringify({
-          target_system_id: targetSystemId,
-          requested_columns: selectedCols
+      await Promise.all(targetSystemIds.map(id => 
+        fetch('http://localhost:4000/api/data-requests', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${savedKey}` 
+          },
+          body: JSON.stringify({
+            target_system_id: id,
+            requested_columns: selectedCols
+          })
         })
-      });
-      if (res.ok) {
-        alert("Data access request securely dispatched to CDEMS Superadmin!");
-        setDataRequestModalOpen(false);
-        setTargetSystemId(null);
-        setReqColumns({});
-      } else {
-        alert("Failed to submit data request.");
-      }
+      ));
+      
+      alert("Data access requests securely dispatched to CDEMS Superadmin!");
+      setDataRequestModalOpen(false);
+      setTargetSystemIds([]);
+      setReqColumns({});
     } catch (e) {
       alert("Error submitting data request.");
     } finally {
       setModalLoading(false);
+    }
+  };
+
+  const handleCellEdit = (docId: any, originalId: any, key: string, val: string) => {
+    setApprovedData(prev => prev.map(d => ({
+      ...d,
+      citizens: d.citizens.map((c: any) => 
+        c._docId === docId && c._originalId === originalId ? { ...c, [key]: val } : c
+      )
+    })));
+  };
+
+  const syncEdit = async (docId: any, originalId: any, updates: any) => {
+    try {
+      const res = await fetch('http://localhost:4000/api/data/update-citizen', {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${savedKey}`
+        },
+        body: JSON.stringify({ docId, originalId, updates })
+      });
+      if (res.ok) alert('Synced directly to CDEMS Database!');
+      else alert('Sync failed. The data might have moved or you lack permissions.');
+    } catch (e) {
+      alert('Network error syncing to CDEMS.');
     }
   };
 
@@ -290,6 +315,11 @@ function App() {
       /> {label}
     </label>
   );
+
+  const allApprovedCitizens = approvedData.flatMap(d => 
+    d.citizens.map((c: any) => ({ ...c, _sourceRecordProvider: d.providerName }))
+  );
+  const allApprovedCols = Array.from(new Set(approvedData.flatMap(d => d.requestedColumns)));
 
   return (
     <div className="container" style={{maxWidth: '1000px'}}>
@@ -561,53 +591,77 @@ function App() {
               ) : (
                 <>
                   <p style={{color: '#64748b', fontSize: '0.9rem', marginBottom: '1.5rem', marginTop: '0.75rem'}}>
-                    The CDEMS Superadmin successfully authorized your requests to view external office records.
+                    Your authorized cross-platform data streams have been securely compiled into your master inbox grid below.
                   </p>
 
-                  {approvedData.map((dataset: any) => (
-                    <div key={dataset.requestId} className="data-config-panel" style={{marginBottom: '2rem'}}>
-                      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                        <h4 style={{margin: 0}}>Data from: {dataset.providerName}</h4>
-                        <button 
-                          className="btn-action primary-action" 
-                          style={{padding: '0.4rem 0.8rem', fontSize: '0.8rem', margin: 0}}
-                          onClick={() => downloadAsExcel(dataset)}
-                          disabled={!dataset.citizens || dataset.citizens.length === 0}
-                        >
-                          ⬇️ Download Excel (CSV)
-                        </button>
-                      </div>
-                      <p className="config-desc" style={{marginTop: '0.5rem'}}>
-                        <span className="badge active">Authorized</span> 
-                        &nbsp;&nbsp;Specifically approved columns: {dataset.requestedColumns.join(', ')}
-                      </p>
-                      
-                      {!dataset.citizens || dataset.citizens.length === 0 ? (
-                        <p style={{fontSize: '0.85rem', color: '#64748b'}}>No records found in the approved dataset.</p>
-                      ) : (
-                        <div className="table-wrapper">
-                          <table className="citizen-table">
-                            <thead>
-                              <tr>
-                                {dataset.requestedColumns.map((col: string) => (
-                                  <th key={col}>{col}</th>
-                                ))}
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {dataset.citizens.map((record: any, i: number) => (
-                                <tr key={i}>
-                                  {dataset.requestedColumns.map((col: string) => (
-                                    <td key={col}>{record[col] || '-'}</td>
-                                  ))}
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
+                  <div className="data-config-panel" style={{marginBottom: '2rem'}}>
+                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                      <h4 style={{margin: 0}}>Unified Encrypted Inbox</h4>
+                      <button 
+                        className="btn-action primary-action" 
+                        style={{padding: '0.4rem 0.8rem', fontSize: '0.8rem', margin: 0}}
+                        onClick={() => downloadAsExcel({ requestedColumns: allApprovedCols, citizens: allApprovedCitizens, providerName: "Unified_CDEMS" })}
+                        disabled={allApprovedCitizens.length === 0}
+                      >
+                        ⬇️ Download Unified Excel
+                      </button>
                     </div>
-                  ))}
+                    <p className="config-desc" style={{marginTop: '0.5rem', marginBottom: '1rem'}}>
+                      <span className="badge active">Authorized & Synced</span> 
+                      &nbsp;&nbsp;Live merged records across all selected providers. Any inline edits made will sync back to central CDEMS.
+                    </p>
+                    
+                    {allApprovedCitizens.length === 0 ? (
+                      <p style={{fontSize: '0.85rem', color: '#64748b'}}>No records found in the approved datasets.</p>
+                    ) : (
+                      <div className="table-wrapper">
+                        <table className="citizen-table">
+                          <thead>
+                            <tr>
+                              <th>Tracking Source DB</th>
+                              {allApprovedCols.map((col: string) => <th key={col}>{col}</th>)}
+                              <th>Sync Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {allApprovedCitizens.map((record: any, i: number) => (
+                              <tr key={`${record._docId}-${record._originalId}-${i}`}>
+                                <td><span className="badge secondary whitespace-nowrap">{record._sourceRecordProvider}</span></td>
+                                {allApprovedCols.map((col: string) => (
+                                  <td key={col} style={{ padding: '0.2rem' }}>
+                                    <input 
+                                      type="text" 
+                                      value={record[col] || ''}
+                                      onChange={e => handleCellEdit(record._docId, record._originalId, col, e.target.value)}
+                                      style={{ width: '100%', minWidth: '80px', border: '1px solid transparent', background: 'transparent', padding: '0.4rem', borderRadius: '4px' }}
+                                      onFocus={e => Object.assign(e.target.style, { border: '1px solid #cbd5e1', background: 'white' })}
+                                      onBlur={e => Object.assign(e.target.style, { border: '1px solid transparent', background: 'transparent' })}
+                                      placeholder="-"
+                                    />
+                                  </td>
+                                ))}
+                                <td>
+                                  <button 
+                                    className="btn-outline" 
+                                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', fontWeight: 'bold' }}
+                                    onClick={() => {
+                                      const cleanRecord = { ...record };
+                                      delete cleanRecord._docId;
+                                      delete cleanRecord._originalId;
+                                      delete cleanRecord._sourceRecordProvider;
+                                      syncEdit(record._docId, record._originalId, cleanRecord);
+                                    }}
+                                  >
+                                    ↻ Push Sync
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
                 </>
               )}
             </div>
@@ -637,19 +691,27 @@ function App() {
               <p>Loading directory...</p>
             ) : (
               <>
-                <div className="form-section-title">1. Select Target Provider</div>
+                <div className="form-section-title">1. Select Target Provider(s)</div>
                 <div className="provider-list">
                   {registeredSystems
                     .filter((s: any) => s.status === 'active' && s.name !== systemName)
                     .map((s: any) => (
-                      <div 
+                      <label 
                         key={s.id} 
-                        className={`provider-item ${targetSystemId === s.id ? 'selected' : ''}`}
-                        onClick={() => setTargetSystemId(s.id)}
+                        className={`provider-item ${targetSystemIds.includes(s.id) ? 'selected' : ''}`}
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
                       >
+                        <input 
+                          type="checkbox" 
+                          checked={targetSystemIds.includes(s.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) setTargetSystemIds([...targetSystemIds, s.id]);
+                            else setTargetSystemIds(targetSystemIds.filter(id => id !== s.id));
+                          }}
+                        />
                         <strong>{s.name}</strong>
                         <span className="badge active" style={{fontSize: '0.7rem'}}>Active</span>
-                      </div>
+                      </label>
                     ))
                   }
                   {registeredSystems.filter((s: any) => s.status === 'active' && s.name !== systemName).length === 0 && (
@@ -657,7 +719,7 @@ function App() {
                   )}
                 </div>
 
-                {targetSystemId && (
+                {targetSystemIds.length > 0 && (
                   <>
                     <div className="form-section-title">2. Select Requested Columns</div>
                     <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', marginBottom: '1.5rem'}}>
