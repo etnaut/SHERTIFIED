@@ -3,45 +3,69 @@ import './App.css';
 
 function App() {
   const [apiKey, setApiKey] = useState('');
-  const [savedKey, setSavedKey] = useState(localStorage.getItem('system_b_api_key') || '');
+  const [savedKey, setSavedKey] = useState(localStorage.getItem('system_peso_api_key') || '');
   const [systemName, setSystemName] = useState('');
   const [status, setStatus] = useState<string | null>(null);
   const [permissions, setPermissions] = useState<any>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // PESO Data Structure Shared Columns
   const [sharedColumns, setSharedColumns] = useState({
-    firstName: true, middleName: false, lastName: true, suffix: false,
-    gender: true, birthDate: false, age: true, placeOfBirth: false,
-    civilStatus: false, citizenship: false, houseNumber: false,
-    street: true, purok: true, subdivision: false, barangay: true,
-    city: true, province: true, status: true, incidentCount: true
+    firstName: true, middleName: false, lastName: true,
+    gender: true, birthDate: false, age: true,
+    civilStatus: false, barangay: true, city: true, province: true,
+    contactNumber: false, emailAddress: false,
+
+    highestEducationalAttainment: true, courseDegree: true,
+    schoolName: false, yearGraduated: false,
+
+    employmentStatus: true, typeOfEmployment: false,
+    occupationJobTitle: true, workExperience: false, skillsSpecializations: false,
+
+    technicalSkills: true, certifications: false, trainingsAttended: false, licenses: false,
+
+    preferredJobPosition: true, preferredLocation: false,
+    expectedSalary: false, availability: true
   });
 
-  const [citizenData, setCitizenData] = useState({
+  const [applicantData, setApplicantData] = useState({
     firstName: '',
     middleName: '',
     lastName: '',
-    suffix: '',
     gender: 'Male',
     birthDate: '',
     age: '',
-    placeOfBirth: '',
     civilStatus: 'Single',
-    citizenship: 'Filipino',
-    
-    houseNumber: '',
-    street: '',
-    purok: '',
-    subdivision: '',
     barangay: '',
     city: '',
     province: '',
+    contactNumber: '',
+    emailAddress: '',
 
-    status: 'Active Resident',
-    incidentCount: 0
+    highestEducationalAttainment: '',
+    courseDegree: '',
+    schoolName: '',
+    yearGraduated: '',
+
+    employmentStatus: 'Unemployed',
+    typeOfEmployment: '',
+    occupationJobTitle: '',
+    workExperience: '',
+    skillsSpecializations: '',
+
+    technicalSkills: '',
+    certifications: '',
+    trainingsAttended: '',
+    licenses: '',
+
+    preferredJobPosition: '',
+    preferredLocation: '',
+    expectedSalary: '',
+    availability: 'Immediate'
   });
 
-  const [savedCitizens, setSavedCitizens] = useState<any[]>([]);
+  const [savedApplicants, setSavedApplicants] = useState<any[]>([]);
 
   // Cross-system Data Request State
   const [isDataRequestModalOpen, setDataRequestModalOpen] = useState(false);
@@ -52,19 +76,19 @@ function App() {
   const [modalLoading, setModalLoading] = useState(false);
 
   useEffect(() => {
-    if (citizenData.birthDate) {
+    if (applicantData.birthDate) {
       const today = new Date();
-      const birthDate = new Date(citizenData.birthDate);
+      const birthDate = new Date(applicantData.birthDate);
       let age = today.getFullYear() - birthDate.getFullYear();
       const m = today.getMonth() - birthDate.getMonth();
       if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
         age--;
       }
-      setCitizenData(prev => ({ ...prev, age: age.toString() }));
+      setApplicantData(prev => ({ ...prev, age: age.toString() }));
     } else {
-      setCitizenData(prev => ({ ...prev, age: '' }));
+      setApplicantData(prev => ({ ...prev, age: '' }));
     }
-  }, [citizenData.birthDate]);
+  }, [applicantData.birthDate]);
 
   const checkStatus = async (key: string) => {
     setLoading(true);
@@ -90,9 +114,8 @@ function App() {
       setSystemName(data.name || '');
       setPermissions(data.permissions || {});
       setSavedKey(key);
-      localStorage.setItem('system_b_api_key', key);
+      localStorage.setItem('system_peso_api_key', key);
       
-      // Fetch authorized data requests if active
       if (data.status === 'active') {
         fetchApprovedData(key);
       }
@@ -118,7 +141,7 @@ function App() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('system_b_api_key');
+    localStorage.removeItem('system_peso_api_key');
     setSavedKey('');
     setSystemName('');
     setStatus(null);
@@ -126,19 +149,19 @@ function App() {
     setApiKey('');
   };
 
-  const handleAddCitizen = () => {
-    if (!citizenData.firstName || !citizenData.lastName) {
+  const handleAddApplicant = () => {
+    if (!applicantData.firstName || !applicantData.lastName) {
       alert("First Name and Last Name are required.");
       return;
     }
-    setSavedCitizens([...savedCitizens, { ...citizenData, id: Date.now() }]);
-    setCitizenData({
-      firstName: '', middleName: '', lastName: '', suffix: '', 
-      gender: 'Male', birthDate: '', age: '', placeOfBirth: '', 
-      civilStatus: 'Single', citizenship: 'Filipino',
-      houseNumber: '', street: '', purok: '', subdivision: '', 
-      barangay: '', city: '', province: '',
-      status: 'Active Resident', incidentCount: 0
+    setSavedApplicants([...savedApplicants, { ...applicantData, id: Date.now() }]);
+    setApplicantData({
+      firstName: '', middleName: '', lastName: '', gender: 'Male', birthDate: '', age: '',
+      civilStatus: 'Single', barangay: '', city: '', province: '', contactNumber: '', emailAddress: '',
+      highestEducationalAttainment: '', courseDegree: '', schoolName: '', yearGraduated: '',
+      employmentStatus: 'Unemployed', typeOfEmployment: '', occupationJobTitle: '', workExperience: '', skillsSpecializations: '',
+      technicalSkills: '', certifications: '', trainingsAttended: '', licenses: '',
+      preferredJobPosition: '', preferredLocation: '', expectedSalary: '', availability: 'Immediate'
     });
   };
 
@@ -207,9 +230,9 @@ function App() {
     if (!dataset.citizens || dataset.citizens.length === 0) return;
     
     const headers = dataset.requestedColumns.join(",");
-    const rows = dataset.citizens.map((citizen: any) => {
+    const rows = dataset.citizens.map((record: any) => {
       return dataset.requestedColumns.map((col: string) => {
-        let val = citizen[col] ?? "";
+        let val = record[col] ?? "";
         val = String(val).replace(/"/g, '""');
         if (/[",\n]/.test(val)) val = `"${val}"`;
         return val;
@@ -231,7 +254,7 @@ function App() {
     return (
       <div className="container center-screen">
         <div className="card login-card">
-          <h1>Barangay Management Portal</h1>
+          <h1>PESO Information Portal</h1>
           <p>Please enter the API Key provided by the CDEMS superadmin to connect.</p>
           <form onSubmit={handleSaveKey} className="key-form">
             <input 
@@ -258,7 +281,6 @@ function App() {
 
   const noActionChecked = !canSendData && !canRequestRecords && !canViewReports;
 
-  // Helper for rendering column checkboxes
   const ColumnCheckbox = ({ field, label }: { field: keyof typeof sharedColumns, label: string }) => (
     <label className="checkbox-label" style={{ fontSize: '0.8rem', padding: '0.2rem 0' }}>
       <input 
@@ -273,9 +295,9 @@ function App() {
     <div className="container" style={{maxWidth: '1000px'}}>
       <div className="header">
         <div>
-          <h1>Barangay System Dashboard</h1>
+          <h1>PESO System Dashboard</h1>
           <p>
-            Connected Name: <strong>{systemName || 'Unknown Office'}</strong><br/>
+            Connected Name: <strong>{systemName || 'PESO Office'}</strong><br/>
             Network: CDEMS Core
           </p>
         </div>
@@ -309,89 +331,102 @@ function App() {
                   <div className="send-data-container">
                     
                     <div className="citizen-form-panel">
-                      <h4>Citizen Data Entry</h4>
+                      <h4>PESO Applicant Data Entry</h4>
                       
-                      <div className="form-section-title">Basic Personal Information</div>
+                      <div className="form-section-title">Personal Information</div>
                       <div className="form-grid">
-                        <div className="form-group"><label>First Name</label><input type="text" value={citizenData.firstName} onChange={e => setCitizenData({...citizenData, firstName: e.target.value})} /></div>
-                        <div className="form-group"><label>Middle Name</label><input type="text" value={citizenData.middleName} onChange={e => setCitizenData({...citizenData, middleName: e.target.value})} /></div>
-                        <div className="form-group"><label>Last Name</label><input type="text" value={citizenData.lastName} onChange={e => setCitizenData({...citizenData, lastName: e.target.value})} /></div>
-                        <div className="form-group"><label>Suffix</label><input type="text" value={citizenData.suffix} onChange={e => setCitizenData({...citizenData, suffix: e.target.value})} placeholder="Jr., Sr." /></div>
-                        
-                        <div className="form-group">
-                          <label>Gender</label>
-                          <select className="form-select" value={citizenData.gender} onChange={e => setCitizenData({...citizenData, gender: e.target.value})}>
+                        <div className="form-group"><label>First Name</label><input type="text" value={applicantData.firstName} onChange={e => setApplicantData({...applicantData, firstName: e.target.value})} /></div>
+                        <div className="form-group"><label>Middle Name</label><input type="text" value={applicantData.middleName} onChange={e => setApplicantData({...applicantData, middleName: e.target.value})} /></div>
+                        <div className="form-group"><label>Last Name</label><input type="text" value={applicantData.lastName} onChange={e => setApplicantData({...applicantData, lastName: e.target.value})} /></div>
+                        <div className="form-group"><label>Gender</label>
+                          <select className="form-select" value={applicantData.gender} onChange={e => setApplicantData({...applicantData, gender: e.target.value})}>
                             <option>Male</option><option>Female</option><option>Other</option>
                           </select>
                         </div>
-                        <div className="form-group"><label>Birth Date</label><input type="date" value={citizenData.birthDate} onChange={e => setCitizenData({...citizenData, birthDate: e.target.value})} /></div>
-                        <div className="form-group"><label>Age</label><input type="text" value={citizenData.age} readOnly style={{backgroundColor: '#f1f5f9'}} /></div>
-                        <div className="form-group"><label>Place of Birth</label><input type="text" value={citizenData.placeOfBirth} onChange={e => setCitizenData({...citizenData, placeOfBirth: e.target.value})} /></div>
-                        
-                        <div className="form-group">
-                          <label>Civil Status</label>
-                          <select className="form-select" value={citizenData.civilStatus} onChange={e => setCitizenData({...citizenData, civilStatus: e.target.value})}>
+                        <div className="form-group"><label>Birth Date</label><input type="date" value={applicantData.birthDate} onChange={e => setApplicantData({...applicantData, birthDate: e.target.value})} /></div>
+                        <div className="form-group"><label>Age</label><input type="text" value={applicantData.age} readOnly style={{backgroundColor: '#f1f5f9'}} /></div>
+                        <div className="form-group"><label>Civil Status</label>
+                          <select className="form-select" value={applicantData.civilStatus} onChange={e => setApplicantData({...applicantData, civilStatus: e.target.value})}>
                             <option>Single</option><option>Married</option><option>Widowed</option><option>Separated</option>
                           </select>
                         </div>
-                        <div className="form-group"><label>Citizenship</label><input type="text" value={citizenData.citizenship} onChange={e => setCitizenData({...citizenData, citizenship: e.target.value})} /></div>
+                        <div className="form-group"><label>Barangay</label><input type="text" value={applicantData.barangay} onChange={e => setApplicantData({...applicantData, barangay: e.target.value})} /></div>
+                        <div className="form-group"><label>City</label><input type="text" value={applicantData.city} onChange={e => setApplicantData({...applicantData, city: e.target.value})} /></div>
+                        <div className="form-group"><label>Province</label><input type="text" value={applicantData.province} onChange={e => setApplicantData({...applicantData, province: e.target.value})} /></div>
+                        <div className="form-group"><label>Contact Number</label><input type="text" value={applicantData.contactNumber} onChange={e => setApplicantData({...applicantData, contactNumber: e.target.value})} /></div>
+                        <div className="form-group"><label>Email Address</label><input type="email" value={applicantData.emailAddress} onChange={e => setApplicantData({...applicantData, emailAddress: e.target.value})} /></div>
                       </div>
 
-                      <div className="form-section-title">Address Information</div>
+                      <div className="form-section-title">Education Background</div>
                       <div className="form-grid">
-                        <div className="form-group"><label>House Number</label><input type="text" value={citizenData.houseNumber} onChange={e => setCitizenData({...citizenData, houseNumber: e.target.value})} /></div>
-                        <div className="form-group"><label>Street</label><input type="text" value={citizenData.street} onChange={e => setCitizenData({...citizenData, street: e.target.value})} /></div>
-                        <div className="form-group"><label>Purok / Zone</label><input type="text" value={citizenData.purok} onChange={e => setCitizenData({...citizenData, purok: e.target.value})} /></div>
-                        <div className="form-group"><label>Subdivision / Sitio</label><input type="text" value={citizenData.subdivision} onChange={e => setCitizenData({...citizenData, subdivision: e.target.value})} /></div>
-                        <div className="form-group"><label>Barangay</label><input type="text" value={citizenData.barangay} onChange={e => setCitizenData({...citizenData, barangay: e.target.value})} /></div>
-                        <div className="form-group"><label>City / Mun.</label><input type="text" value={citizenData.city} onChange={e => setCitizenData({...citizenData, city: e.target.value})} /></div>
-                        <div className="form-group"><label>Province</label><input type="text" value={citizenData.province} onChange={e => setCitizenData({...citizenData, province: e.target.value})} /></div>
+                        <div className="form-group"><label>Highest Educational Attainment</label><input type="text" value={applicantData.highestEducationalAttainment} onChange={e => setApplicantData({...applicantData, highestEducationalAttainment: e.target.value})} /></div>
+                        <div className="form-group"><label>Course / Degree</label><input type="text" value={applicantData.courseDegree} onChange={e => setApplicantData({...applicantData, courseDegree: e.target.value})} /></div>
+                        <div className="form-group"><label>School Name</label><input type="text" value={applicantData.schoolName} onChange={e => setApplicantData({...applicantData, schoolName: e.target.value})} /></div>
+                        <div className="form-group"><label>Year Graduated</label><input type="text" value={applicantData.yearGraduated} onChange={e => setApplicantData({...applicantData, yearGraduated: e.target.value})} /></div>
                       </div>
 
-                      <div className="form-section-title">Barangay Records</div>
+                      <div className="form-section-title">Employment Information</div>
                       <div className="form-grid">
-                        <div className="form-group">
-                          <label>Clearance Status</label>
-                          <select value={citizenData.status} onChange={e => setCitizenData({...citizenData, status: e.target.value})} className="form-select">
-                            <option>Active Resident</option>
-                            <option>Cleared</option>
-                            <option>Under Verification</option>
-                            <option>Has Hit / Record</option>
+                        <div className="form-group"><label>Employment Status</label>
+                          <select className="form-select" value={applicantData.employmentStatus} onChange={e => setApplicantData({...applicantData, employmentStatus: e.target.value})}>
+                            <option>Employed</option><option>Unemployed</option>
                           </select>
                         </div>
-                        <div className="form-group">
-                          <label>Incidents / Blotters</label>
-                          <input type="number" min="0" value={citizenData.incidentCount} onChange={e => setCitizenData({...citizenData, incidentCount: parseInt(e.target.value) || 0})} />
+                        <div className="form-group"><label>Type of Employment</label>
+                          <select className="form-select" value={applicantData.typeOfEmployment} onChange={e => setApplicantData({...applicantData, typeOfEmployment: e.target.value})}>
+                            <option value="">Select...</option><option>Full-time</option><option>Part-time</option><option>Contractual</option>
+                          </select>
+                        </div>
+                        <div className="form-group"><label>Occupation / Job Title</label><input type="text" value={applicantData.occupationJobTitle} onChange={e => setApplicantData({...applicantData, occupationJobTitle: e.target.value})} /></div>
+                        <div className="form-group"><label>Work Experience</label><input type="text" value={applicantData.workExperience} onChange={e => setApplicantData({...applicantData, workExperience: e.target.value})} /></div>
+                        <div className="form-group"><label>Skills / Specializations</label><input type="text" value={applicantData.skillsSpecializations} onChange={e => setApplicantData({...applicantData, skillsSpecializations: e.target.value})} /></div>
+                      </div>
+
+                      <div className="form-section-title">Skills & Training</div>
+                      <div className="form-grid">
+                        <div className="form-group"><label>Technical Skills</label><input type="text" value={applicantData.technicalSkills} onChange={e => setApplicantData({...applicantData, technicalSkills: e.target.value})} /></div>
+                        <div className="form-group"><label>Certifications</label><input type="text" value={applicantData.certifications} onChange={e => setApplicantData({...applicantData, certifications: e.target.value})} /></div>
+                        <div className="form-group"><label>Trainings Attended</label><input type="text" value={applicantData.trainingsAttended} onChange={e => setApplicantData({...applicantData, trainingsAttended: e.target.value})} /></div>
+                        <div className="form-group"><label>Licenses</label><input type="text" value={applicantData.licenses} onChange={e => setApplicantData({...applicantData, licenses: e.target.value})} /></div>
+                      </div>
+
+                      <div className="form-section-title">Job Preference</div>
+                      <div className="form-grid">
+                        <div className="form-group"><label>Preferred Job / Position</label><input type="text" value={applicantData.preferredJobPosition} onChange={e => setApplicantData({...applicantData, preferredJobPosition: e.target.value})} /></div>
+                        <div className="form-group"><label>Preferred Location</label><input type="text" value={applicantData.preferredLocation} onChange={e => setApplicantData({...applicantData, preferredLocation: e.target.value})} /></div>
+                        <div className="form-group"><label>Expected Salary</label><input type="text" value={applicantData.expectedSalary} onChange={e => setApplicantData({...applicantData, expectedSalary: e.target.value})} /></div>
+                        <div className="form-group"><label>Availability</label>
+                          <select className="form-select" value={applicantData.availability} onChange={e => setApplicantData({...applicantData, availability: e.target.value})}>
+                            <option>Immediate</option><option>Soon</option>
+                          </select>
                         </div>
                       </div>
                       
-                      <button className="btn-secondary mt-4 w-full" onClick={handleAddCitizen}>
-                        + Add Citizen to Local Table
+                      <button className="btn-secondary mt-4 w-full" onClick={handleAddApplicant}>
+                        + Add Applicant to Local Table
                       </button>
                     </div>
 
-                    {savedCitizens.length > 0 && (
+                    {savedApplicants.length > 0 && (
                       <div className="citizen-form-panel">
-                        <h4>Local Citizens Data ({savedCitizens.length})</h4>
+                        <h4>Local Applicants Data ({savedApplicants.length})</h4>
                         <div className="table-wrapper">
                           <table className="citizen-table">
                             <thead>
                               <tr>
                                 <th>Name</th>
                                 <th>Age / Gender</th>
-                                <th>Address</th>
                                 <th>Status</th>
-                                <th>Blotters</th>
+                                <th>Target Job</th>
                               </tr>
                             </thead>
                             <tbody>
-                              {savedCitizens.map((c) => (
-                                <tr key={c.id}>
-                                  <td>{c.lastName}, {c.firstName} {c.middleName && c.middleName.charAt(0)+'.'}</td>
-                                  <td>{c.age ? `${c.age} yrs` : '-'} / {c.gender?.charAt(0)}</td>
-                                  <td>{c.barangay ? `${c.street || ''} ${c.barangay}, ${c.city}` : '-'}</td>
-                                  <td><span className={`badge ${c.status === 'Cleared' ? 'active' : 'unknown'}`}>{c.status}</span></td>
-                                  <td>{c.incidentCount > 0 ? <span style={{color:'red', fontWeight:'bold'}}>{c.incidentCount}</span> : '0'}</td>
+                              {savedApplicants.map((a) => (
+                                <tr key={a.id}>
+                                  <td>{a.lastName}, {a.firstName} {a.middleName && a.middleName.charAt(0)+'.'}</td>
+                                  <td>{a.age ? `${a.age} yrs` : '-'} / {a.gender?.charAt(0)}</td>
+                                  <td><span className={`badge ${a.employmentStatus === 'Employed' ? 'active' : 'unknown'}`}>{a.employmentStatus}</span></td>
+                                  <td>{a.preferredJobPosition || '-'}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -402,70 +437,67 @@ function App() {
 
                     <div className="data-config-panel">
                       <h4>Data Sharing Configuration</h4>
-                      <p className="config-desc">Select which columns from the <strong>Citizens</strong> table to share:</p>
+                      <p className="config-desc">Select which columns from the <strong>Applicants</strong> table to share:</p>
                       
-                      <div className="form-section-title" style={{marginTop: '0.5rem', marginBottom: '0.5rem'}}>Personal Specs</div>
+                      <div className="form-section-title" style={{marginTop: '0.5rem', marginBottom: '0.5rem'}}>Personal Info</div>
                       <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.25rem', marginBottom: '1rem'}}>
                         <ColumnCheckbox field="firstName" label="First Name" />
                         <ColumnCheckbox field="middleName" label="Middle Name" />
                         <ColumnCheckbox field="lastName" label="Last Name" />
-                        <ColumnCheckbox field="suffix" label="Suffix" />
                         <ColumnCheckbox field="gender" label="Gender" />
                         <ColumnCheckbox field="birthDate" label="Birth Date" />
                         <ColumnCheckbox field="age" label="Age" />
-                        <ColumnCheckbox field="placeOfBirth" label="Place of Birth" />
                         <ColumnCheckbox field="civilStatus" label="Civil Status" />
-                        <ColumnCheckbox field="citizenship" label="Citizenship" />
-                      </div>
-
-                      <div className="form-section-title" style={{marginTop: '0.5rem', marginBottom: '0.5rem'}}>Location & Status</div>
-                      <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.25rem'}}>
-                        <ColumnCheckbox field="houseNumber" label="House Number" />
-                        <ColumnCheckbox field="street" label="Street" />
-                        <ColumnCheckbox field="purok" label="Purok" />
-                        <ColumnCheckbox field="subdivision" label="Subdivision" />
                         <ColumnCheckbox field="barangay" label="Barangay" />
                         <ColumnCheckbox field="city" label="City" />
                         <ColumnCheckbox field="province" label="Province" />
-                        <ColumnCheckbox field="status" label="Clearance Status" />
-                        <ColumnCheckbox field="incidentCount" label="Incident Count" />
+                        <ColumnCheckbox field="contactNumber" label="Contact Num" />
+                        <ColumnCheckbox field="emailAddress" label="Email" />
+                      </div>
+
+                      <div className="form-section-title" style={{marginTop: '0.5rem', marginBottom: '0.5rem'}}>Education</div>
+                      <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.25rem', marginBottom: '1rem'}}>
+                        <ColumnCheckbox field="highestEducationalAttainment" label="Highest Attainment" />
+                        <ColumnCheckbox field="courseDegree" label="Course" />
+                        <ColumnCheckbox field="schoolName" label="School" />
+                        <ColumnCheckbox field="yearGraduated" label="Year Graduated" />
+                      </div>
+
+                      <div className="form-section-title" style={{marginTop: '0.5rem', marginBottom: '0.5rem'}}>Employment</div>
+                      <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.25rem', marginBottom: '1rem'}}>
+                        <ColumnCheckbox field="employmentStatus" label="Empl. Status" />
+                        <ColumnCheckbox field="typeOfEmployment" label="Empl. Type" />
+                        <ColumnCheckbox field="occupationJobTitle" label="Job Title" />
+                        <ColumnCheckbox field="workExperience" label="Experience" />
+                        <ColumnCheckbox field="skillsSpecializations" label="Specializations" />
+                      </div>
+
+                      <div className="form-section-title" style={{marginTop: '0.5rem', marginBottom: '0.5rem'}}>Skills & Training / Job Pref</div>
+                      <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.25rem'}}>
+                        <ColumnCheckbox field="technicalSkills" label="Tech Skills" />
+                        <ColumnCheckbox field="certifications" label="Certs" />
+                        <ColumnCheckbox field="trainingsAttended" label="Trainings" />
+                        <ColumnCheckbox field="licenses" label="Licenses" />
+                        <ColumnCheckbox field="preferredJobPosition" label="Target Job" />
+                        <ColumnCheckbox field="preferredLocation" label="Target Loc" />
+                        <ColumnCheckbox field="expectedSalary" label="Exp. Salary" />
+                        <ColumnCheckbox field="availability" label="Availability" />
                       </div>
                     </div>
 
                   <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
-                    <button className="btn-action primary-action" disabled={savedCitizens.length === 0} onClick={async () => {
-                      alert(`Sending secure payload of ${savedCitizens.length} citizens to CDEMS...`);
+                    <button className="btn-action primary-action" disabled={savedApplicants.length === 0} onClick={async () => {
+                      alert(`Sending secure payload of ${savedApplicants.length} applicants to CDEMS...`);
                       
                       const payloadToShare: any = { 
                         timestamp: new Date().toISOString(),
-                        citizens: savedCitizens.map(citizen => {
+                        citizens: savedApplicants.map(applicant => {
                           const rec: any = {};
-                          if (sharedColumns.firstName) rec.firstName = citizen.firstName;
-                          if (sharedColumns.middleName) rec.middleName = citizen.middleName;
-                          if (sharedColumns.lastName) rec.lastName = citizen.lastName;
-                          if (sharedColumns.suffix) rec.suffix = citizen.suffix;
-                          if (sharedColumns.gender) rec.gender = citizen.gender;
-                          if (sharedColumns.birthDate) rec.birthDate = citizen.birthDate;
-                          if (sharedColumns.age) rec.age = citizen.age;
-                          if (sharedColumns.placeOfBirth) rec.placeOfBirth = citizen.placeOfBirth;
-                          if (sharedColumns.civilStatus) rec.civilStatus = citizen.civilStatus;
-                          if (sharedColumns.citizenship) rec.citizenship = citizen.citizenship;
-                          
-                          if (sharedColumns.houseNumber) rec.houseNumber = citizen.houseNumber;
-                          if (sharedColumns.street) rec.street = citizen.street;
-                          if (sharedColumns.purok) rec.purok = citizen.purok;
-                          if (sharedColumns.subdivision) rec.subdivision = citizen.subdivision;
-                          if (sharedColumns.barangay) rec.barangay = citizen.barangay;
-                          if (sharedColumns.city) rec.city = citizen.city;
-                          if (sharedColumns.province) rec.province = citizen.province;
-                          
-                          if (sharedColumns.status) {
-                            rec.clearanceStatus = citizen.status;
-                          }
-                          if (sharedColumns.incidentCount) {
-                            rec.incidentCount = citizen.incidentCount;
-                            rec.hasIncidents = citizen.incidentCount > 0;
-                          }
+                          Object.keys(sharedColumns).forEach(key => {
+                            if ((sharedColumns as any)[key]) {
+                              rec[key] = applicant[key];
+                            }
+                          });
                           return rec;
                         })
                       };
@@ -481,7 +513,7 @@ function App() {
                             payload: payloadToShare
                           })
                         });
-                        alert('Done! Local citizens data securely shared to CDEMS.');
+                        alert('Done! Local applicant data securely shared to CDEMS.');
                       } catch (e) {
                         alert('Error sharing data');
                       }
@@ -540,7 +572,7 @@ function App() {
                           className="btn-action primary-action" 
                           style={{padding: '0.4rem 0.8rem', fontSize: '0.8rem', margin: 0}}
                           onClick={() => downloadAsExcel(dataset)}
-                          disabled={dataset.citizens.length === 0}
+                          disabled={!dataset.citizens || dataset.citizens.length === 0}
                         >
                           ⬇️ Download Excel (CSV)
                         </button>
@@ -550,7 +582,7 @@ function App() {
                         &nbsp;&nbsp;Specifically approved columns: {dataset.requestedColumns.join(', ')}
                       </p>
                       
-                      {dataset.citizens.length === 0 ? (
+                      {!dataset.citizens || dataset.citizens.length === 0 ? (
                         <p style={{fontSize: '0.85rem', color: '#64748b'}}>No records found in the approved dataset.</p>
                       ) : (
                         <div className="table-wrapper">
@@ -563,10 +595,10 @@ function App() {
                               </tr>
                             </thead>
                             <tbody>
-                              {dataset.citizens.map((citizen: any, i: number) => (
+                              {dataset.citizens.map((record: any, i: number) => (
                                 <tr key={i}>
                                   {dataset.requestedColumns.map((col: string) => (
-                                    <td key={col}>{citizen[col] || '-'}</td>
+                                    <td key={col}>{record[col] || '-'}</td>
                                   ))}
                                 </tr>
                               ))}
@@ -621,7 +653,7 @@ function App() {
                     ))
                   }
                   {registeredSystems.filter((s: any) => s.status === 'active' && s.name !== systemName).length === 0 && (
-                    <p style={{fontSize: '0.85rem', color: '#64748b'}}>No other active providers available.</p>
+                     <p style={{fontSize: '0.85rem', color: '#64748b'}}>No other active providers available.</p>
                   )}
                 </div>
 
@@ -629,7 +661,7 @@ function App() {
                   <>
                     <div className="form-section-title">2. Select Requested Columns</div>
                     <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', marginBottom: '1.5rem'}}>
-                      {["firstName", "lastName", "age", "gender", "civilStatus", "barangay", "city", "clearanceStatus", "incidentCount"].map(col => (
+                      {["firstName", "lastName", "age", "gender", "civilStatus", "barangay", "city", "highestEducationalAttainment", "employmentStatus", "occupationJobTitle"].map(col => (
                         <label key={col} className="checkbox-label">
                           <input 
                             type="checkbox" 

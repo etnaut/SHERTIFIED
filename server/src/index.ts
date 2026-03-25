@@ -6,12 +6,13 @@ import { AppDataSource } from './db';
 import { User } from './entities/User';
 import { System } from './entities/System';
 import { SharedData } from './entities/SharedData';
+import { DataRequest } from './entities/DataRequest';
 import crypto from 'crypto';
 
 dotenv.config();
 
 const app = express();
-app.use(cors({ origin: 'http://localhost:8080' }));
+app.use(cors());
 app.use(express.json());
 
 const sanitizeUser = (user: User) => {
@@ -79,7 +80,17 @@ app.get('/dashboard-stats', async (_req: Request, res: Response) => {
   }
 });
 
-app.get('/data-requests', (_req: Request, res: Response) => res.json([]));
+app.get('/data-requests', async (_req: Request, res: Response) => {
+  try {
+    const requests = await DataRequest.find({
+      relations: ['requester', 'target'],
+      order: { createdAt: 'DESC' }
+    });
+    res.json(requests);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch data requests' });
+  }
+});
 app.get('/citizen-records', (_req: Request, res: Response) => res.json([]));
 
 app.post('/systems', async (req: Request, res: Response) => {
@@ -252,6 +263,17 @@ AppDataSource.initialize().then(async () => {
       );
     `);
 
+    await AppDataSource.query(`
+      CREATE TABLE IF NOT EXISTS data_request (
+        id SERIAL PRIMARY KEY,
+        requester_system_id INTEGER REFERENCES systems(system_id) ON DELETE CASCADE,
+        target_system_id INTEGER REFERENCES systems(system_id) ON DELETE CASCADE,
+        requested_columns JSONB NOT NULL,
+        status VARCHAR(50) DEFAULT 'pending',
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // Endpoint for System B to POST shared data
     app.post('/api/data/share', authenticateSystem, async (req: Request, res: Response) => {
       try {
@@ -278,6 +300,134 @@ AppDataSource.initialize().then(async () => {
         res.json(data);
       } catch (error) {
         res.status(500).json({ error: 'Failed to fetch shared data' });
+      }
+    });
+
+    // Endpoint for System B to request data from another system
+    app.post('/api/data-requests', authenticateSystem, async (req: Request, res: Response) => {
+      try {
+        const system = (req as any).system as System;
+        const { target_system_id, requested_columns } = req.body;
+        
+        if (!target_system_id || !requested_columns) {
+          return res.status(400).json({ error: 'Missing target_system_id or requested_columns' });
+        }
+
+        const newReq = DataRequest.create({
+          requester_system_id: system.id,
+          target_system_id,
+          requested_columns,
+          status: 'pending'
+        });
+        await newReq.save();
+        res.status(201).json(newReq);
+      } catch (err) {
+        res.status(500).json({ error: 'Failed to create request' });
+      }
+    });
+
+    // Endpoint for Superadmin to approve/reject data requests
+    app.patch('/api/data-requests/:id/status', async (req: Request, res: Response) => {
+      try {
+        const { id } = req.params;
+        const { status } = req.body;
+        const dReq = await DataRequest.findOne({ where: { id: Number(id) } });
+        if (!dReq) return res.status(404).json({ error: 'Data request not found' });
+        
+        dReq.status = status;
+        await dReq.save();
+        res.json(dReq);
+      } catch (err) {
+        res.status(500).json({ error: 'Failed to patch request' });
+      }
+    });
+
+    // Endpoint for System B to retrieve its APPROVED request data
+    app.get('/api/system/approved-data', authenticateSystem, async (req: Request, res: Response) => {
+      try {
+        const system = (req as any).system as System;
+        const approvedRequests = await DataRequest.find({ 
+          where: { requester_system_id: system.id, status: 'approved' },
+          relations: ['target']
+        });
+
+        const results = [];
+        for (const dreq of approvedRequests) {
+          const sharedDocs = await SharedData.find({ where: { system_id: dreq.target_system_id } });
+          const filteredCitizens = [];
+          
+          for (const doc of sharedDocs) {
+            if (doc.payload?.citizens && Array.isArray(doc.payload.citizens)) {
+              const citizensFiltered = doc.payload.citizens.map((citizen: any) => {
+                const compiled: any = {};
+                for (const col of dreq.requested_columns) {
+                  if (citizen[col] !== undefined) {
+                    compiled[col] = citizen[col];
+                  }
+                }
+                return compiled;
+              });
+              filteredCitizens.push(...citizensFiltered);
+            }
+          }
+          results.push({
+            requestId: dreq.id,
+            providerName: dreq.target.name,
+            requestedColumns: dreq.requested_columns,
+            citizens: filteredCitizens
+          });
+        }
+        res.json(results);
+      } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch authorized data' });
+      }
+    });
+
+    // Endpoint for Superadmin InfoTracker unified search
+    app.get('/api/info-tracker/search', async (req: Request, res: Response) => {
+      try {
+        const query = (req.query.q as string || '').toLowerCase();
+        if (!query) return res.json(null);
+
+        // Fetch all shared records from all systems ascending by created_at 
+        // so that later records overwrite earlier ones when assigned to the combined object
+        const sharedDocs = await SharedData.find({ order: { createdAt: 'ASC' } });
+        const systems = await System.find();
+        
+        const systemMap = new Map();
+        systems.forEach((s: System) => systemMap.set(s.id, s.name));
+        
+        let combinedData: any = {};
+        const sources: string[] = [];
+        let found = false;
+
+        for (const doc of sharedDocs) {
+          if (doc.payload?.citizens && Array.isArray(doc.payload.citizens)) {
+            const citizen = doc.payload.citizens.find((c: any) => {
+              const fullName = `${c.firstName || ''} ${c.lastName || ''}`.toLowerCase();
+              return fullName.includes(query) || (c.citizenId && c.citizenId.toLowerCase().includes(query));
+            });
+
+            if (citizen) {
+              found = true;
+              combinedData = { ...combinedData, ...citizen };
+              
+              const sysName = systemMap.get(doc.system_id) || `System ID ${doc.system_id}`;
+              if (!sources.includes(sysName)) sources.push(sysName);
+            }
+          }
+        }
+
+        if (!found) {
+          return res.json(null);
+        }
+
+        res.json({
+          record: combinedData,
+          sources
+        });
+      } catch (err) {
+        res.status(500).json({ error: 'Search failed' });
       }
     });
 

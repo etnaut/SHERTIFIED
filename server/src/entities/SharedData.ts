@@ -3,14 +3,14 @@ import { BaseEntity, Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } 
 @Entity('shared_data')
 export class SharedData extends BaseEntity {
     @PrimaryGeneratedColumn()
-    id: number;
+    id!: number;
 
     @Column()
-    system_id: number;
+    system_id!: number;
 
     @Column({ type: 'jsonb' })
-    payload: any;
+    payload!: any;
 
     @CreateDateColumn({ name: 'created_at' })
-    createdAt: Date;
+    createdAt!: Date;
 }

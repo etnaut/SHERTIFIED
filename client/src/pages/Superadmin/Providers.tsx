@@ -1,16 +1,21 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Building2, Search, Database } from "lucide-react";
+import { Building2, Search } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 
 export default function Providers() {
   const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<any | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search]);
 
   // Fetch all systems
   const { data: systems = [], isLoading } = useQuery({
@@ -26,17 +31,11 @@ export default function Providers() {
     p.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  // Fetch shared data for the selected system
-  const { data: sharedData = [], isLoading: isLoadingShared } = useQuery({
-    queryKey: ['shared-data', selected?.id],
-    queryFn: async () => {
-      if (!selected?.id) return [];
-      const res = await fetch(`http://localhost:4000/api/systems/${selected.id}/shared-data`);
-      if (!res.ok) throw new Error('Failed to fetch shared data');
-      return res.json();
-    },
-    enabled: !!selected?.id
-  });
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const paginated = filtered.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -58,18 +57,18 @@ export default function Providers() {
       </div>
 
       {isLoading ? (
-        <div className="text-center text-muted-foreground">Loading systems...</div>
+        <div className="text-center text-muted-foreground p-8">Loading providers directory...</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((provider: any) => (
+          {paginated.map((provider: any) => (
             <Card
               key={provider.id}
-              className="cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => setSelected(provider)}
+              className="cursor-pointer hover:shadow-md transition-shadow group"
+              onClick={() => navigate(`/providers/${provider.name}`)}
             >
               <CardContent className="p-5">
                 <div className="flex items-start justify-between mb-3">
-                  <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center group-hover:bg-secondary/20 transition-colors">
                     <Building2 className="h-5 w-5 text-secondary" />
                   </div>
                   <Badge variant={provider.status === "active" ? "default" : (provider.status === "pending" ? "outline" : "destructive")} className={provider.status === "active" ? "bg-success text-success-foreground" : ""}>
@@ -79,84 +78,40 @@ export default function Providers() {
                 <h3 className="font-semibold text-foreground">{provider.name}</h3>
                 <div className="flex items-center justify-between mt-4 pt-3 border-t">
                   <span className="text-xs text-muted-foreground">Registered: {new Date(provider.createdAt).toLocaleDateString()}</span>
-                  <span className="text-xs font-medium text-foreground">ID: {provider.id}</span>
+                  <span className="text-xs font-medium text-foreground">System Name: {provider.name}</span>
                 </div>
               </CardContent>
             </Card>
           ))}
           {filtered.length === 0 && (
-            <div className="text-sm text-muted-foreground col-span-full">No systems found.</div>
+            <div className="text-sm text-muted-foreground col-span-full p-8 text-center border rounded-md border-dashed">
+              No systems match your search.
+            </div>
           )}
         </div>
       )}
 
-      <Dialog open={!!selected} onOpenChange={() => setSelected(null)}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{selected?.name}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label className="text-muted-foreground text-xs uppercase tracking-wider">Status</Label>
-              <div className="mt-1">
-                <Badge variant={selected?.status === "active" ? "default" : "outline"} className={selected?.status === "active" ? "bg-success text-success-foreground" : ""}>
-                  {selected?.status.toUpperCase()}
-                </Badge>
-              </div>
-            </div>
-            
-            <div>
-              <Label className="text-muted-foreground text-xs uppercase tracking-wider">API Key</Label>
-              <div className="mt-1 flex items-center gap-2">
-                <Input readOnly value={selected?.apiKey || ""} className="font-mono text-sm bg-muted" />
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">This key is used by the external system to authenticate.</p>
-            </div>
-
-            <div>
-              <Label className="text-muted-foreground text-xs uppercase tracking-wider">Requested Permissions</Label>
-              <div className="mt-1 text-sm bg-muted p-3 rounded-md min-h-[60px]">
-                {selected?.permissions?.capabilities || "No specific permissions requested"}
-              </div>
-            </div>
-
-            <div>
-              <Label className="text-muted-foreground text-xs uppercase tracking-wider">Registered At</Label>
-              <div className="mt-1 text-sm bg-muted p-3 rounded-md">
-                {selected?.createdAt ? new Date(selected.createdAt).toLocaleString() : ""}
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-border">
-              <Label className="text-foreground text-sm font-semibold flex items-center gap-2 mb-3">
-                <Database className="h-4 w-4 text-primary" />
-                Data Shared to CDEMS by this Office
-              </Label>
-              
-              {isLoadingShared ? (
-                <div className="text-sm text-muted-foreground">Loading shared data...</div>
-              ) : sharedData.length === 0 ? (
-                <div className="text-sm text-muted-foreground italic bg-muted/30 p-4 rounded-md text-center border border-dashed">
-                  This system has not shared any data to the main CDEMS network yet.
-                </div>
-              ) : (
-                <div className="space-y-3 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
-                  {sharedData.map((data: any) => (
-                    <div key={data.id} className="bg-muted p-3 rounded-md border text-xs relative">
-                      <div className="absolute top-2 right-2 text-[10px] text-muted-foreground">
-                        {new Date(data.createdAt).toLocaleString()}
-                      </div>
-                      <pre className="mt-2 font-mono whitespace-pre-wrap text-foreground">
-                        {JSON.stringify(data.payload, null, 2)}
-                      </pre>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {totalPages > 1 && !isLoading && (
+        <div className="flex justify-between items-center mt-6">
+          <button
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="px-4 py-2 border rounded-md disabled:opacity-50 text-sm font-medium hover:bg-muted"
+          >
+            Previous
+          </button>
+          <span className="text-sm text-muted-foreground font-medium">
+            Page {currentPage} of {totalPages}
+          </span>
+          <button
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="px-4 py-2 border rounded-md disabled:opacity-50 text-sm font-medium hover:bg-muted"
+          >
+            Next
+          </button>
+        </div>
+      )}
     </div>
   );
 }

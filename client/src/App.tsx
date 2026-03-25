@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/AppLayout";
 import Dashboard from "@/pages/Superadmin/Dashboard";
 import Providers from "@/pages/Superadmin/Providers";
+import ProviderDetails from "@/pages/Superadmin/ProviderDetails";
 import Registration from "@/pages/Superadmin/Registration";
 import DataRequests from "@/pages/Superadmin/DataRequests";
 import InfoTracker from "@/pages/Superadmin/InfoTracker";
@@ -29,6 +30,7 @@ const App = () => (
           <Route element={<AppLayout />}>
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="providers" element={<Providers />} />
+            <Route path="providers/:name" element={<ProviderDetails />} />
             <Route path="registration" element={<Registration />} />
             <Route path="data-requests" element={<DataRequests />} />
             <Route path="tracker" element={<InfoTracker />} />
