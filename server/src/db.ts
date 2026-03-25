@@ -4,6 +4,7 @@ import { User } from './entities/User';
 import { System } from './entities/System';
 import { SharedData } from './entities/SharedData';
 import { DataRequest } from './entities/DataRequest';
+import { SystemLog } from './entities/SystemLog';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -17,7 +18,7 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_DATABASE || 'CDEMS_DB',
   synchronize: false,
   logging: false,
-  entities: [User, System, SharedData, DataRequest],
+  entities: [User, System, SharedData, DataRequest, SystemLog],
   migrations: [],
   subscribers: [],
 });

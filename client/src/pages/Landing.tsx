@@ -10,7 +10,7 @@ const Landing = () => {
     <div className="flex min-h-screen items-center justify-center bg-muted p-4">
       <div className="w-full max-w-4xl">
         <div className="text-center mb-10 space-y-4">
-          <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">Welcome to SHERTIFIED</h1>
+          <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">Welcome to CDEMS</h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Please choose your portal to continue. External partners must register, while authorized personnel can sign in directly.
           </p>

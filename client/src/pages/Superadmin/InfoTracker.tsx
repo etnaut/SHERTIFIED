@@ -9,12 +9,14 @@ export default function InfoTracker() {
   const [result, setResult] = useState<any | null>(null);
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [selectedSource, setSelectedSource] = useState<string | null>(null);
 
   const handleSearch = async () => {
     if (!search.trim()) return;
     setSearched(true);
     setLoading(true);
     setResult(null);
+    setSelectedSource(null);
 
     try {
       const res = await fetch(`http://localhost:4000/api/info-tracker/search?q=${encodeURIComponent(search)}`);
@@ -27,6 +29,30 @@ export default function InfoTracker() {
       setLoading(false);
     }
   };
+
+  const displayRecord = result ? (selectedSource && result.systemRecords && result.systemRecords[selectedSource] 
+    ? result.systemRecords[selectedSource] 
+    : result.record) : null;
+
+  const priorityKeys = [
+    'firstName', 'middleName', 'lastName',
+    'age', 'birthDate', 'gender', 'civilStatus', 'civil_status', 
+    'contactNumber', 'emailAddress',
+    'purok', 'barangay', 'city', 'province'
+  ];
+
+  let displayKeys: string[] = [];
+  if (displayRecord) {
+    displayKeys = Object.keys(displayRecord).filter(k => !['clearanceStatus', 'status', 'citizenId'].includes(k));
+    displayKeys.sort((a, b) => {
+      const iA = priorityKeys.indexOf(a);
+      const iB = priorityKeys.indexOf(b);
+      if (iA !== -1 && iB !== -1) return iA - iB;
+      if (iA !== -1) return -1;
+      if (iB !== -1) return 1;
+      return a.localeCompare(b);
+    });
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -67,36 +93,49 @@ export default function InfoTracker() {
         </Card>
       )}
 
-      {result && (
+      {result && displayRecord && (
         <Card className="animate-slide-up mt-6 border-secondary/20 border-2">
           <CardHeader className="bg-muted/50 pb-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <CardTitle className="text-2xl text-primary">{result.record.firstName} {result.record.lastName}</CardTitle>
+                <CardTitle className="text-2xl text-primary font-mono">{result.record.citizenId || 'Citizen Profile'}</CardTitle>
                 <div className="flex flex-wrap items-center gap-2 mt-2">
-                  <Badge variant="outline" className="bg-secondary/10 text-secondary border-secondary/20">
+                  <Badge 
+                    variant={selectedSource === null ? "default" : "outline"} 
+                    className={`text-xs cursor-pointer border-secondary/20 transition-colors ${selectedSource === null ? 'bg-secondary text-secondary-foreground hover:bg-secondary/90' : 'bg-secondary/10 text-secondary hover:bg-secondary/20'}`}
+                    onClick={() => setSelectedSource(null)}
+                  >
                     <Database className="w-3 h-3 mr-1" /> Multi-System Sync
                   </Badge>
                   {result.sources.map((src: string) => (
-                    <Badge key={src} variant="secondary" className="text-xs">{src}</Badge>
+                    <Badge 
+                      key={src} 
+                      variant={selectedSource === src ? "default" : "secondary"} 
+                      className="text-xs cursor-pointer transition-colors"
+                      onClick={() => setSelectedSource(selectedSource === src ? null : src)}
+                    >
+                      {src}
+                    </Badge>
                   ))}
                 </div>
               </div>
               <div className="sm:text-right">
                 <div className="text-xs text-muted-foreground mb-1">Clearance Status</div>
-                <Badge className={result.record.clearanceStatus === 'Cleared' || result.record.status === 'Active Resident' ? 'bg-success hover:bg-success' : 'bg-destructive hover:bg-destructive'}>
-                  {result.record.clearanceStatus || result.record.status || 'Unknown'}
+                <Badge className={displayRecord.clearanceStatus === 'Cleared' || displayRecord.status === 'Active Resident' ? 'bg-success hover:bg-success' : 'bg-destructive hover:bg-destructive'}>
+                  {displayRecord.clearanceStatus || displayRecord.status || 'Unknown'}
                 </Badge>
               </div>
             </div>
           </CardHeader>
           <CardContent className="pt-6">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4 border-b pb-2">Unified Master Record</h3>
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4 border-b pb-2">
+              {selectedSource ? `${selectedSource} Record` : 'Unified Master Record'}
+            </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-y-6 gap-x-4">
-              {Object.entries(result.record).filter(([k]) => !['firstName', 'lastName', 'clearanceStatus', 'status'].includes(k)).map(([key, val]) => (
+              {displayKeys.map(key => (
                 <div key={key} className="space-y-1">
                   <span className="text-xs text-muted-foreground capitalize break-words font-medium">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
-                  <div className="font-medium text-sm text-foreground break-words">{String(val || '-')}</div>
+                  <div className="font-medium text-sm text-foreground break-words">{String(displayRecord[key] || '-')}</div>
                 </div>
               ))}
             </div>

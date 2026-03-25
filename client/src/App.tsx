@@ -10,6 +10,7 @@ import ProviderDetails from "@/pages/Superadmin/ProviderDetails";
 import Registration from "@/pages/Superadmin/Registration";
 import DataRequests from "@/pages/Superadmin/DataRequests";
 import InfoTracker from "@/pages/Superadmin/InfoTracker";
+import SystemLogs from "@/pages/Superadmin/SystemLogs";
 import NotFound from "@/pages/NotFound";
 import Login from "@/pages/Login";
 import SystemRegister from "@/pages/SystemRegister";
@@ -34,6 +35,7 @@ const App = () => (
             <Route path="registration" element={<Registration />} />
             <Route path="data-requests" element={<DataRequests />} />
             <Route path="tracker" element={<InfoTracker />} />
+            <Route path="logs" element={<SystemLogs />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

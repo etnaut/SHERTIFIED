@@ -1,4 +1,4 @@
-import { LayoutDashboard, Building2, UserPlus, FileSearch, ShieldCheck, LogOut } from "lucide-react";
+import { LayoutDashboard, Building2, UserPlus, FileSearch, ShieldCheck, LogOut, ActivitySquare } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -21,6 +21,7 @@ const navItems = [
   { title: "Registration Queue", url: "/registration", icon: UserPlus },
   { title: "Data Requests", url: "/data-requests", icon: FileSearch },
   { title: "Information Tracker", url: "/tracker", icon: ShieldCheck },
+  { title: "System Logs", url: "/logs", icon: ActivitySquare },
 ];
 
 export function AppSidebar() {

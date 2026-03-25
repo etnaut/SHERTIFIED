@@ -7,6 +7,7 @@ import { User } from './entities/User';
 import { System } from './entities/System';
 import { SharedData } from './entities/SharedData';
 import { DataRequest } from './entities/DataRequest';
+import { SystemLog } from './entities/SystemLog';
 import crypto from 'crypto';
 
 dotenv.config();
@@ -23,6 +24,15 @@ const sanitizeUser = (user: User) => {
 app.get('/', (_req: Request, res: Response) => {
   res.send('SHERTIFIED server is running');
 });
+
+const logAction = async (actor: string, action: string, target: string) => {
+  try {
+    const log = SystemLog.create({ actor, action, target });
+    await log.save();
+  } catch (e) {
+    console.error('Failed to log action', e);
+  }
+};
 
 app.get('/users', async (_req: Request, res: Response) => {
   try {
@@ -110,6 +120,7 @@ app.post('/systems', async (req: Request, res: Response) => {
     });
     await system.save();
     
+    await logAction(system.name, 'Registered', 'System Integration');
     res.status(201).json({ system, apiKey });
   } catch (error) {
     res.status(500).json({ error: 'Failed to register system', details: (error as Error).message });
@@ -136,7 +147,10 @@ app.patch('/systems/:id/status', async (req: Request, res: Response) => {
         system.apiKey = jwt.sign(payload, 'super-secret-shertified-key');
         system.permissions = permissions;
         system.status = status;
-        system.save().then(() => res.json(system));
+        system.save().then(async () => {
+          await logAction('Superadmin', `Set System Status to ${status}`, `System ${system.name}`);
+          res.json(system);
+        });
       });
       return;
     }
@@ -145,6 +159,7 @@ app.patch('/systems/:id/status', async (req: Request, res: Response) => {
     if (permissions !== undefined) system.permissions = permissions;
 
     await system.save();
+    await logAction('Superadmin', `Set System Status to ${status}`, `System ${system.name}`);
     res.json(system);
   } catch (error) {
     res.status(500).json({ error: 'Failed to update system status' });
@@ -274,6 +289,16 @@ AppDataSource.initialize().then(async () => {
       );
     `);
 
+    await AppDataSource.query(`
+      CREATE TABLE IF NOT EXISTS system_logs (
+        id SERIAL PRIMARY KEY,
+        actor TEXT NOT NULL,
+        action TEXT NOT NULL,
+        target TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // Endpoint for System B to POST shared data
     app.post('/api/data/share', authenticateSystem, async (req: Request, res: Response) => {
       try {
@@ -285,6 +310,7 @@ AppDataSource.initialize().then(async () => {
           payload
         });
         await shared.save();
+        await logAction(system.name, 'Shared Data', `To CDEMS`);
         
         res.json({ message: 'Data securely shared to CDEMS', id: shared.id });
       } catch (error) {
@@ -320,6 +346,10 @@ AppDataSource.initialize().then(async () => {
           status: 'pending'
         });
         await newReq.save();
+
+        const targetSys = await System.findOne({ where: { id: target_system_id } });
+        await logAction(system.name, 'Requested Data', `From ${targetSys?.name || 'Unknown'} (Columns: ${requested_columns.length})`);
+        
         res.status(201).json(newReq);
       } catch (err) {
         res.status(500).json({ error: 'Failed to create request' });
@@ -336,6 +366,7 @@ AppDataSource.initialize().then(async () => {
         
         dReq.status = status;
         await dReq.save();
+        await logAction('Superadmin', `Request ${status === 'approved' ? 'Approved' : 'Rejected'}`, `Request ID ${dReq.id}`);
         res.json(dReq);
       } catch (err) {
         res.status(500).json({ error: 'Failed to patch request' });
@@ -390,7 +421,6 @@ AppDataSource.initialize().then(async () => {
         if (!query) return res.json(null);
 
         // Fetch all shared records from all systems ascending by created_at 
-        // so that later records overwrite earlier ones when assigned to the combined object
         const sharedDocs = await SharedData.find({ order: { createdAt: 'ASC' } });
         const systems = await System.find();
         
@@ -399,6 +429,7 @@ AppDataSource.initialize().then(async () => {
         
         let combinedData: any = {};
         const sources: string[] = [];
+        const systemRecords: any = {};
         let found = false;
 
         for (const doc of sharedDocs) {
@@ -412,8 +443,11 @@ AppDataSource.initialize().then(async () => {
               found = true;
               combinedData = { ...combinedData, ...citizen };
               
-              const sysName = systemMap.get(doc.system_id) || `System ID ${doc.system_id}`;
+              const sysName = systemMap.get(doc.system_id) || `System ${doc.system_id}`;
               if (!sources.includes(sysName)) sources.push(sysName);
+              
+              // Keep the latest record from this specific system
+              systemRecords[sysName] = { ...(systemRecords[sysName] || {}), ...citizen };
             }
           }
         }
@@ -424,10 +458,20 @@ AppDataSource.initialize().then(async () => {
 
         res.json({
           record: combinedData,
-          sources
+          sources,
+          systemRecords
         });
       } catch (err) {
         res.status(500).json({ error: 'Search failed' });
+      }
+    });
+
+    app.get('/api/system-logs', async (req: Request, res: Response) => {
+      try {
+        const logs = await SystemLog.find({ order: { createdAt: 'DESC' }, take: 500 });
+        res.json(logs);
+      } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch logs' });
       }
     });
 
